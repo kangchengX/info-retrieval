@@ -8,14 +8,14 @@ from torch.utils.data import DataLoader, TensorDataset
 from warnings import warn
 
 
-class RetrieveModel:
-    '''The base retrieval model. Polymorphism for the predict method'''
+class RetrieveBaseModel:
+    '''The base model to train. Polymorphism for the predict method.'''
     def predict(self, **kwargs):
-        '''Predict'''
+        '''Predict.'''
         raise NotImplementedError("Subclass must implement abstract method")
 
 
-class LogisticRegression(RetrieveModel):
+class LogisticRegression(RetrieveBaseModel):
     '''The logistic regression model
 
     Attributes:
@@ -99,7 +99,7 @@ class LogisticRegression(RetrieveModel):
         return self.forward(inputs)
     
 
-class ReXGBRanker(xgb.XGBRanker, RetrieveModel):
+class ReXGBRanker(xgb.XGBRanker, RetrieveBaseModel):
     '''The XGB ranker Retrieval Model'''
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -113,7 +113,7 @@ class ReXGBRanker(xgb.XGBRanker, RetrieveModel):
         return self.predict(inputs)
     
 
-class MLP(nn.Module, RetrieveModel):
+class MLP(nn.Module, RetrieveBaseModel):
     '''The simple mlp model'''
     def __init__(self, word_dim: int, num_class: int | None = 1):
         '''Initialize the model
@@ -340,7 +340,7 @@ class Trainer:
 class LearningRetriever:
     def __init__(
             self, 
-            model: RetrieveModel,
+            model: RetrieveBaseModel,
             data: pd.DataFrame
     ):
         """Initialize the model
@@ -383,10 +383,8 @@ class LearningRetriever:
         data_group = score_df.groupby('qid',sort=False)
 
         results = pd.DataFrame()
-        for _,passage in data_group:
-            scores = passage.sort_values(by='score',ascending=False)
-            if num_top_results is not None:
-                scores = scores[0: num_top_results]
+        for _, passage in data_group:
+            scores = passage.sort_values(by='score',ascending=False)[0:num_top_results]
             results = pd.concat([results, scores], ignore_index=True)
 
         return results

@@ -99,11 +99,11 @@ class Scorer:
         '''
         self.score_type = score_type
         self.kwargs = kwargs
-        # set the 'mu' as 1 by default
-        # by doing this, the 'mu' can be fixed when partial calculate_score_discounting
-        self.kwargs['mu'] = self.kwargs.get('mu', 1)
+        # # set the 'mu' as 1 by default
+        # # by doing this, the 'mu' can be fixed when partial calculate_score_discounting
+        # self.kwargs['mu'] = self.kwargs.get('mu', 1)
 
-        if score_type == 'lidstone' and np.isclose(self.kwargs['mu'], 1):
+        if score_type == 'lidstone' and np.isclose(self.kwargs.get('mu', 50), 1):
             warn(f'mu is close to 1')
 
         self._add_score_function_partial()
@@ -130,7 +130,7 @@ class Scorer:
         )
 
     def _add_score_function_partial(self):
-        '''Add the corresponding partial score function according to the score type to\
+        '''Add the corresponding partial score function according to the score type
         to fix the hyperperameters of the score functions as well as collection-level features.'''
         if self.score_type == 'bm25':
             self._calculate_score_BM25_partial = partial(
@@ -141,7 +141,7 @@ class Scorer:
                 **self.kwargs
             )
 
-        elif self.score_type == 'laplace' or 'lidstone':
+        elif self.score_type == 'laplace' or self.score_type == 'lidstone':
             self._calculate_score_discounting_partial = partial(
                 calculate_score_discounting,
                 num_unique_words=len(self.data_loader.doc_loader.inverted_indices),
@@ -165,7 +165,7 @@ class Scorer:
             self.score_funct = self._calculate_score_tfidf
         elif self.score_type == 'bm25':
             self.score_funct = self._calculate_score_BM25
-        elif self.score_type == 'laplace' or 'lidstone':
+        elif self.score_type == 'laplace' or self.score_type == 'lidstone':
             self.score_funct = self._calculate_score_discounting
         elif self.score_type == 'dirichlet':
             self.score_funct = self._calculate_score_dirichlet
@@ -187,9 +187,9 @@ class Scorer:
         self.tf_passage_dict_view.update_pid(pid)
         
         return self._calculate_score_BM25_partial(
-            tf_idf_query=self.tf_idf_query_dict_view,
-            tf_idf_passage=self.tf_idf_passage_dict_view,
-            passage_length=self.data_loader.doc_loader.passages_length[pid]
+            tf_query=self.tf_query_dict_view,
+            tf_passage=self.tf_passage_dict_view,
+            passages_length=self.data_loader.doc_loader.passages_length[pid]
         )
     
     def _calculate_score_discounting(self, qid, pid):
@@ -198,9 +198,9 @@ class Scorer:
         self.tf_passage_dict_view.update_pid(pid)
         
         return self._calculate_score_discounting_partial(
-            tf_idf_query=self.tf_idf_query_dict_view,
-            tf_idf_passage=self.tf_idf_passage_dict_view,
-            passage_length=self.data_loader.doc_loader.passages_length[pid]
+            tf_query=self.tf_query_dict_view,
+            tf_passage=self.tf_passage_dict_view,
+            passages_length=self.data_loader.doc_loader.passages_length[pid]
         )
     
     def _calculate_score_dirichlet(self, qid, pid):
@@ -209,9 +209,9 @@ class Scorer:
         self.tf_passage_dict_view.update_pid(pid)
 
         return self._calculate_score_dirichlet_partial(
-            tf_idf_query=self.tf_idf_query_dict_view,
-            tf_idf_passage=self.tf_idf_passage_dict_view,
-            passage_length=self.data_loader.doc_loader.passages_length[pid]
+            tf_query=self.tf_query_dict_view,
+            tf_passage=self.tf_passage_dict_view,
+            passages_length=self.data_loader.doc_loader.passages_length[pid]
         )
     
 
@@ -220,7 +220,7 @@ class TraditionRetriever():
             self,
             data_loader: DataLoader,
             retrieve_type: Literal['tf-idf', 'bm25', 'likelihood'],
-            smooth_type: Literal['laplace', 'lidstone', 'dirichlet'] | None = 'laplace',
+            smooth_type: Literal['laplace', 'lidstone', 'dirichlet'] | None = None,
             **kwargs
     ):
         """Initialize the class
@@ -228,22 +228,21 @@ class TraditionRetriever():
         Args:
             data_loader: the data loader containing the queries and docs (or passages)
             retrieve_type: the retrieval type. Can be 'tf-idf', 'bm25' or 'likelihood'
-            smooth_type: the smoothing method to use when retrieve_type is 'likelihood'\
+            smooth_type: the smoothing method to use when retrieve_type is 'likelihood'
                 Can be 'laplace', 'lidstone', 'dirichlet'
             kwargs: the hyperamters for the score function, can be:
                 'k1' (float), 'k2' (float), 'b' (float), for 'bm25', Default is 1.2, 100, 0.75 respectively
                 'eps' (float), for 'discounting', Default is 1
                 'mu' (float), for 'dirichlet', Default is 50
         """
-        super.__init__()
         self.retrieve_type = retrieve_type
         self.kwargs = kwargs
         self.smooth_type = smooth_type
         score_type = self._check_determine_score_type()
+        self._add_message()
         self.scorer = Scorer(data_loader=data_loader,
                              score_type=score_type,
                              **self.kwargs)
-        self._add_message()
         
 
     def _add_message(self):
@@ -259,14 +258,14 @@ class TraditionRetriever():
 
     def retrieve(
             self,
-            query_candidate: pd.DataFrame,
+            num_top_results: int | None = None,
             print_details: bool | None = False,
             filename: str | None = None
     ):
         """Retrieve.
         
         Args:
-            query_candidate: a DataFrame with columns(qid, pid)
+            num_top_results: number of the top results tp return if not None
             print_details: If True, for each query, print when retrival is finish
             filename: filename to save the retrival results. If None, the retrival results will not be saved
 
@@ -276,8 +275,7 @@ class TraditionRetriever():
         
         print(f'start : {self.message}')
 
-        retrieval_results = self._retrieve_part(query_candidate=query_candidate,
-                                                print_details=print_details)
+        retrieval_results = self._retrieve(num_top_results=num_top_results, print_details=print_details)
         if filename is not None:
             retrieval_results.to_csv(filename,index=False,header=False)
 
@@ -285,17 +283,49 @@ class TraditionRetriever():
 
         return retrieval_results
     
+    def _retrieve(
+            self,
+            num_top_results: int | None = None,
+            print_details: bool | None = False
+    ):
+        '''Retrieve according to the query_candidate
+
+        Args:
+            num_top_results: number of the top results tp return if not None
+            print_details: If True, for each query, print when retrival is finish
+
+        Returns:
+            retrieve_all: retrieval resultes for all queries
+        '''
+
+        retrieve_all = []
+        for qid, values in self.scorer.data_loader.query_candidate.groupby('qid'):
+            # calculate the retrieve score for each pid under this qid
+            retrieve_qid = [(qid, pid, self._calculate_score(qid, pid)) for pid in values['pid']][:num_top_results]
+            retrieve_qid = pd.DataFrame(retrieve_qid, columns=['pid','qid','score']).sort_values(by='score', ascending=False)
+            retrieve_all.append(retrieve_qid)
+            if print_details:
+                print('finish query {}'.format(qid))
+
+        retrieve_all = pd.concat(retrieve_all, ignore_index=True)
+
+        return retrieve_all
+    
+    def _calculate_score(self, qid:str, pid:str):
+
+        return self.scorer(qid=qid, pid=pid)
+    
     def reset_retrieval_method(
             self,
-            retrieve_type: Literal['tf-idf', 'bm25', 'likelihood'] | None,
-            smooth_type: Literal['laplace', 'lidstone', 'dirichlet'] | None = 'laplace',
+            retrieve_type: Literal['tf-idf', 'bm25', 'likelihood'] | None = None,
+            smooth_type: Literal['laplace', 'lidstone', 'dirichlet'] | None = None,
             **kwargs
     ):
         '''Reset the retrival method
 
         Args:
             retrieve_type: the retrieval type. Can be 'tf-idf', 'bm25' or 'likelihood'.
-            smooth_type: the smoothing method to use when retrieve_type is 'likelihood'\
+            smooth_type: the smoothing method to use when retrieve_type is 'likelihood'
                 Can be 'laplace', 'lidstone', 'dirichlet'.
             kwargs: the hyperamters for the score function, can be:
                 'k1' (float), 'k2' (float), 'b' (float), for 'bm25', Default is 1.2, 100, 0.75 respectively,
@@ -308,8 +338,6 @@ class TraditionRetriever():
             self.retrieve_type = retrieve_type
             flag = False
         if smooth_type is not None:
-            if self.retrieve_type != 'likelihood':
-                warn('The retrieve type is not likelihood')
             self.smooth_type = smooth_type
             flag = False
         if not kwargs:
@@ -321,44 +349,20 @@ class TraditionRetriever():
             warn('the retrieval method has not been changed')
 
         score_type = self._check_determine_score_type()
+        self._add_message()
         self.scorer.reset_score_type(score_type, **self.kwargs)
 
-    def _retrieve_part(
-            self,
-            query_candidate: pd.DataFrame,
-            print_details: bool | None = False
-    ):
-        '''Retrieve according to the query_candidate
-
-        Args:
-            query_candidate: a DataFrame with columns (qid, pid)
-            print_details: If True, for each query, print when retrival is finish
-
-        Returns:
-            retrieve_all: retrieval resultes for all queries
-        '''
-
-        retrieve_all = pd.DataFrame()
-        for qid, values in query_candidate.groupby('qid'):
-            # calculate the retrieve score for each pid under this qid
-            retrieve = {pid: self.scorer(qid, pid) for pid in values['pid']}
-            retrieve = pd.DataFrame(retrieve)
-            retrieve.insert(loc = 0, column= None, value = qid)
-            retrieve_all = retrieve_all.append(retrieve, ignore_index=True)
-            if print_details:
-                print('finish query {}'.format(qid))
-
-        return retrieve_all
-
     def _check_determine_score_type(self):
-        '''Check the compatibility of retrieve_type, smooth type, and kwargs. \
-        Also, get the score type according to the retrieve_type and smooth_type. \
+        '''Check the compatibility of retrieve_type, smooth type, and kwargs.
+        Also, get the score type according to the retrieve_type and smooth_type.
         
         Returns:
             the score type
         '''
         
-        if self.retrieve_type == 'tf-idf' or 'bm25':
+        if self.retrieve_type == 'tf-idf' or self.retrieve_type == 'bm25':
+            if self.smooth_type is not None:
+                warn(f'the retrieval type is {self.retrieve_type}, but the smoothing type is assgined a value {self.smooth_type}')
             return self.retrieve_type
         
         elif self.retrieve_type == 'likelihood':
@@ -377,7 +381,7 @@ def calculate_score_tfidf(tf_idf_query: dict, tf_idf_passage: dict) -> float:
     Args:
         terms_query: all unique terms in the query
         tf_idf_query_map: a fuction mapping the terms_query to the tf-idf values
-        tf_idf_passage_map: a fuction mapping the term within the passage to the tf-idf values.\
+        tf_idf_passage_map: a fuction mapping the term within the passage to the tf-idf values.
             return 0 if the passage doesn't have this term
 
     Returns:
@@ -409,7 +413,7 @@ def calculate_score_BM25(
         tf_query: dict, 
         tf_passage: dict, 
         tf_collection: dict,
-        passage_length: int,
+        passages_length: int,
         ave_length: float,
         num_passages: int,
         k1: float | None = 1.2,
@@ -430,12 +434,12 @@ def calculate_score_BM25(
         score: the BM25 socre of the query-passage pair
     ''' 
                    
-    K = k1 * ((1 - b) + b * passage_length / ave_length)
+    K = k1 * ((1 - b) + b * passages_length / ave_length)
     
     score = 0
     for term, tf_query_term in tf_query.items():
-        tf_passage_term = tf_passage[term]
-        if tf_passage_term == 0:
+        tf_passage_term = tf_passage.get(term, None)
+        if tf_passage_term is None:
             continue
         tf_collection_term = tf_collection[term]
 
@@ -471,7 +475,7 @@ def calculate_score_discounting(
     score = 0
 
     for term, tf_query_term in tf_query.items():
-        score += tf_query_term * np.log((eps + tf_passage[term]) / (eps * num_unique_words + passages_length))
+        score += tf_query_term * np.log((eps + tf_passage.get(term, 0)) / (eps * num_unique_words + passages_length))
 
     return score
 
@@ -508,7 +512,7 @@ def calculate_score_lidstone(
         tf_passage: dict,
         passages_length: int,
         num_unique_words: int, 
-        eps: float
+        eps: float | None = 0.1
 ) -> float:
     '''Calculate the log score with Laplace smoothing and Lidstone correction for the likelihood retrieval model
 
@@ -517,7 +521,7 @@ def calculate_score_lidstone(
         tf_passage: a dict with all terms of the passage as keys and tf as values
         passages_length: a dict with pids as keys and length of the passage as values
         num_unique_words: number of unique words in the entire collection
-        eps: parammter for the smoothing method
+        eps: parammter for the smoothing method. Default is 0.1
 
     Returns:
         score: the log score
@@ -561,7 +565,11 @@ def calculate_score_dirichlet(
     lam = d / (d + mu)
 
     for term, tf_query_term in tf_query.items():
+        tf_passage_term = tf_passage.get(term, None)
+        if tf_passage_term is None:
+            continue
         score += tf_query_term * np.log(
-            lam * tf_passage[term] / d + (1-lam) * tf_collection[term] / length_collection
+            lam * tf_passage_term / d + (1-lam) * tf_collection[term] / length_collection
         )
     
+    return score

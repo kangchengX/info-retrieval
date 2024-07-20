@@ -45,6 +45,4 @@ def visualize_frequency_zipfian(
         fig.savefig(filename)
 
     if show:
-        fig.show()
-
-    return fig
+        plt.show()

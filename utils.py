@@ -1,8 +1,8 @@
-from typing import Iterable, Tuple, Dict
 import numpy as np
 import pandas as pd
 import nltk, re
-import data
+from typing import Iterable, Tuple, Dict
+from functools import lru_cache
 from nltk.stem import WordNetLemmatizer
 
 
@@ -16,7 +16,7 @@ def count(data: Iterable, frequencies_in_dicts: bool | None = True):
         data: data to count
 
     Returns:
-        result: if frequencies_in_dicts : a dict with terms as keys and frequencies as values,\
+        result: if frequencies_in_dicts : a dict with terms as keys and frequencies as values,
             else: a dict with terms as keys and {'tf': frequency} as values
     '''
 
@@ -42,7 +42,7 @@ def calculate_normalized_frequency_zipfian(
     Args:
         fre: a dict representing the (unnormalized) frequencies of the terms 
         s: parameter of zipfian distribution
-        return_difference : If true, return the difference between the normalized frequencies and the zipfian value,\
+        return_difference : If true, return the difference between the normalized frequencies and the zipfian value,
             defined as the mean of the l2 norm
     
     Returns:
@@ -67,10 +67,31 @@ def calculate_normalized_frequency_zipfian(
         return fre_norm, zipfian
 
 
+class Lemmatizer:
+    def __init__(self, use_cache=True, cache_size=10000):
+        self.use_cache = use_cache
+        self.lemmatizer = WordNetLemmatizer()
+        
+        if self.use_cache:
+            self._lemmatize = lru_cache(maxsize=cache_size)(self._lemmatize_uncached)
+        else:
+            self._lemmatize = self._lemmatize_uncached
+
+    def _lemmatize_uncached(self, word:str, pos:str | None = 'n'):
+        return self.lemmatizer.lemmatize(word, pos)
+
+    def lemmatize(self, word:str, pos:str | None = 'n'):
+        return self._lemmatize(word, pos)
+    
+    def clear_cache(self):
+        if self.use_cache:
+            self._lemmatize.cache_clear()
+
+
 def generate_tokens(
         text: str, 
         pattern: re.Pattern, 
-        lemmatizer: WordNetLemmatizer | None = None, 
+        lemmatizer: Lemmatizer | None = None, 
         stopwords: Iterable | None = None, 
         vocabulary: Iterable | None = None
 ):
@@ -78,12 +99,12 @@ def generate_tokens(
 
     Args: 
         text: the string to process
-        pattern: the Pattern in re. Default is re.compile(r'[^a-zA-Z\s]').
-        lemmatizer: the lemmatizer in nltk.stem to lemmatize the tokens. If None, not lemmatize.\
+        pattern: the Pattern in re. Default is re.compile(r'[^a-zA-Z\\s]').
+        lemmatizer: the lemmatizer to lemmatize the tokens. If None, not lemmatize.
             Default is None
-        stopwords: words to remove. If None, keep all tokens.\
+        stopwords: words to remove. If None, keep all tokens.
             Default is None
-        vocabulary: words to keep. If none, keep all tokens.\
+        vocabulary: words to keep. If none, keep all tokens.
             Default is None
 
     Returns:
@@ -106,92 +127,6 @@ def generate_tokens(
         tokens = [token for token in tokens if token in vocabulary]
 
     return tokens
-
-
-def extract_passage_embedding(doc_loader: data.DocLoader, word_embedding: Dict[str, np.ndarray]):
-    '''Extract passage vector embedding for each passage
-    
-    Args:
-        doc_loader: the loader containing the passages
-        word_embedding: a dict mapping the word to the vector
-
-    Returns:
-        passage_embedding: DataFrame with columns ('pid', 'vector')
-    '''
-    inverted_indices = doc_loader.inverted_indices
-    passages_length = doc_loader.passages_length
-    zero_vector = np.zeros(len(word_embedding['like']), dtype=word_embedding['like'].dtype)
-    passage_embedding = {}
-
-    # iter each term
-    for term, feature_collection_dict in inverted_indices.items():
-        word_vector = word_embedding.get(term, zero_vector)
-        for pid, feature_passage_dict in feature_collection_dict['pids_dict'].items():
-            passage_embedding[pid] = passage_embedding.get(pid, zero_vector) + feature_passage_dict['tf'] * word_vector
-    
-    # average the vectors
-    passage_embedding = {pid: sum_vector / passages_length[pid] 
-                         for pid, sum_vector in passage_embedding.items()}
-    # convert dict to DataFrame
-    passage_embedding = pd.DataFrame(list(passage_embedding.items()), columns=['pid', 'vector'])
-    
-    return passage_embedding
-
-
-def extract_query_embedding(query_loader: data.QueryLoader, word_embedding: Dict[str, np.ndarray]):
-    '''Extract query vector embedding for each query
-    
-    Args:
-        query_loader: the loader containing the queries
-        word_embedding: a dict mapping the word to the vector
-
-    Returns:
-        query_embedding: DataFrame with columns ('qid', 'vector')
-    '''
-    zero_vector = np.zeros(len(word_embedding['like']), dtype=word_embedding['like'].dtype)
-    queries = query_loader.queries
-    query_embedding =  {
-        qid: np.mean(
-            [
-                word_embedding.get(term, zero_vector) * feature_dict['tf'] 
-                for term, feature_dict in term_dict.items()
-            ]
-            )
-        for qid, term_dict in queries.items()
-    }
-    
-    query_embedding = pd.DataFrame(list(query_embedding.items()), columns=['qid','vector'])
-
-    return query_embedding
-
-
-def extract_features(
-        data_loader: data.DataLoader,
-        word_embedding: Dict[str, np.ndarray],
-        query_candidate: pd.DataFrame,
-        filename: str | None = None
-):
-    """Extract feature representation for the query-passage pair. Use inverted indices in data_loader \
-    to improve efficiency. 
-    
-    Args:
-        data_loader: the data loader containing the passages and queris
-        word_embedding: a dict mapping the word to the vector
-        query_candidate: DataFrame with columns (qid, pid)
-        filename: filename to save the features. If None, not save the features
-
-    Returns:
-        features: the 
-    """
-    passage_embedding = extract_passage_embedding(data_loader.doc_loader, word_embedding)
-    query_embedding = extract_query_embedding(data_loader.query_loader, word_embedding)
-
-    features = query_candidate.merge(passage_embedding, on='pid').merge(query_embedding, on='qid')
-
-    if filename is not None:
-        features.to_csv(filename)
-
-    return features
 
 
 def cal_ndcg(relevance: pd.Series):
