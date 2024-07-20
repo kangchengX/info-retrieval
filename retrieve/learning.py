@@ -10,7 +10,7 @@ from warnings import warn
 
 class RetrieveBaseModel:
     '''The base model to train. Polymorphism for the predict method.'''
-    def predict(self, **kwargs):
+    def predict(self):
         '''Predict.'''
         raise NotImplementedError("Subclass must implement abstract method")
 

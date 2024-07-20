@@ -16,6 +16,8 @@ class Scorer:
 
         tf_query_view: a dict veiw mapping the query term to the tf value
         tf_passage_view: a dict view mapping the passage term to the tf value
+        tf_unnrom_query_view: a dict veiw mapping the query term to the unnormalized tf value
+        tf_unnrom_passage_view: a dict view mapping the passage term to the unnormalized tf value
         tf_idf_query_view: a dict view mapping the query term to the tf-idf value
         tf_idf_passage_view: a dict view mapping the passage term to the tf-idf value
         tf_collection_view: a dict view mapping the terms to the tf of the entire collection
@@ -99,9 +101,6 @@ class Scorer:
         '''
         self.score_type = score_type
         self.kwargs = kwargs
-        # # set the 'mu' as 1 by default
-        # # by doing this, the 'mu' can be fixed when partial calculate_score_discounting
-        # self.kwargs['mu'] = self.kwargs.get('mu', 1)
 
         if score_type == 'lidstone' and np.isclose(self.kwargs.get('mu', 50), 1):
             warn(f'mu is close to 1')
@@ -117,6 +116,14 @@ class Scorer:
             original=self.data_loader.doc_loader.inverted_indices,
             ignore_pid_init_error=True
         )
+
+        self.tf_unnorm_query_dict_view = QueryDictView(feature_name='tf-unnorm')
+        self.tf_unnorm_passage_dict_view = DocPidDictView(
+            feature_name='tf-unnorm',
+            original=self.data_loader.doc_loader.inverted_indices,
+            ignore_pid_init_error=True
+        )
+
         self.tf_idf_query_dict_view = QueryDictView(feature_name='tf-idf')
         self.tf_idf_passage_dict_view = DocPidDictView(
             feature_name='tf-idf',
@@ -183,34 +190,34 @@ class Scorer:
     
     def _calculate_score_BM25(self, qid, pid):
         '''Calculate score for BM25'''
-        self.tf_query_dict_view.updata_original(self.data_loader.query_loader.queries[qid])
-        self.tf_passage_dict_view.update_pid(pid)
+        self.tf_unnorm_query_dict_view.updata_original(self.data_loader.query_loader.queries[qid])
+        self.tf_unnorm_passage_dict_view.update_pid(pid)
         
         return self._calculate_score_BM25_partial(
-            tf_query=self.tf_query_dict_view,
-            tf_passage=self.tf_passage_dict_view,
+            tf_unnorm_query=self.tf_unnorm_query_dict_view,
+            tf_unnorm_passage=self.tf_unnorm_passage_dict_view,
             passages_length=self.data_loader.doc_loader.passages_length[pid]
         )
     
     def _calculate_score_discounting(self, qid, pid):
         '''Calculate score for likelihood model with Laplace smoothing with or without Lidstone correction'''
-        self.tf_query_dict_view.updata_original(self.data_loader.query_loader.queries[qid])
-        self.tf_passage_dict_view.update_pid(pid)
+        self.tf_unnorm_query_dict_view.updata_original(self.data_loader.query_loader.queries[qid])
+        self.tf_unnorm_passage_dict_view.update_pid(pid)
         
         return self._calculate_score_discounting_partial(
-            tf_query=self.tf_query_dict_view,
-            tf_passage=self.tf_passage_dict_view,
+            tf_unnorm_query=self.tf_unnorm_query_dict_view,
+            tf_unnorm_passage=self.tf_unnorm_passage_dict_view,
             passages_length=self.data_loader.doc_loader.passages_length[pid]
         )
     
     def _calculate_score_dirichlet(self, qid, pid):
         '''Calculate score for likelihood model with dirichlet smoothing'''
-        self.tf_query_dict_view.updata_original(self.data_loader.query_loader.queries[qid])
-        self.tf_passage_dict_view.update_pid(pid)
+        self.tf_unnorm_query_dict_view.updata_original(self.data_loader.query_loader.queries[qid])
+        self.tf_unnorm_passage_dict_view.update_pid(pid)
 
         return self._calculate_score_dirichlet_partial(
-            tf_query=self.tf_query_dict_view,
-            tf_passage=self.tf_passage_dict_view,
+            tf_unnorm_query=self.tf_unnorm_query_dict_view,
+            tf_unnorm_passage=self.tf_unnorm_passage_dict_view,
             passages_length=self.data_loader.doc_loader.passages_length[pid]
         )
     
@@ -240,9 +247,11 @@ class TraditionRetriever():
         self.smooth_type = smooth_type
         score_type = self._check_determine_score_type()
         self._add_message()
-        self.scorer = Scorer(data_loader=data_loader,
-                             score_type=score_type,
-                             **self.kwargs)
+        self.scorer = Scorer(
+            data_loader=data_loader,
+            score_type=score_type,
+            **self.kwargs
+        )
         
 
     def _add_message(self):
@@ -279,7 +288,7 @@ class TraditionRetriever():
         if filename is not None:
             retrieval_results.to_csv(filename,index=False,header=False)
 
-        print('finish : {}. Length is {}'.format(self.message, len(retrieval_results)))
+        print('finish : {}. Number of retrieval results is {}.'.format(self.message, len(retrieval_results)))
 
         return retrieval_results
     
@@ -387,31 +396,16 @@ def calculate_score_tfidf(tf_idf_query: dict, tf_idf_passage: dict) -> float:
     Returns:
         score: the socre of the query-passage pair for TF-IDF vector space based retrieval model
     '''
-    product = 0
-    norm1 = 0
-    norm2 = 0
 
-    for term, tf_idf_query_term in tf_idf_query.items():
-        # only calculate for the common term
-        tf_idf_passage_term = tf_idf_passage.get(term, 0)
-        if tf_idf_passage_term == 0:
-            continue
-        product += tf_idf_query_term * tf_idf_passage_term
-        norm1 += tf_idf_query_term ** 2
-        norm2 += tf_idf_passage_term ** 2
-
-    # query and passage do not have common term
-    if product == 0:
-        return 0
-
-    score = product / np.sqrt(norm1) / np.sqrt(norm2)
-
-    return(score)
+    return sum([
+        tf_idf_query_term * tf_idf_passage[term]
+        for term, tf_idf_query_term in tf_idf_query.items() if term in tf_idf_passage
+    ])
 
 
 def calculate_score_BM25(
-        tf_query: dict, 
-        tf_passage: dict, 
+        tf_unnorm_query: dict, 
+        tf_unnorm_passage: dict, 
         tf_collection: dict,
         passages_length: int,
         ave_length: float,
@@ -423,9 +417,9 @@ def calculate_score_BM25(
     '''Calculate the score for BM25 model
 
     Args:
-        tf_query: a dict with all terms of the query as keys and tf as values
-        tf_passage: a dict with all terms of the passage as keys and tf as values
-        tf_collection: a dict with all terms of the collection as keys as tf for the entire collection as values
+        tf_unnorm_query: a dict with all terms of the query as keys and unnormalized tf as values
+        tf_unnorm_passage: a dict with all terms of the passage as keys and unnormalized tf as values
+        tf_collection: a dict with all terms of the collection as keys as unnormalized tf for the entire collection as values
         ave_length: average length of the passages
         num_passages: number of the passages (i.e. size of the collection)
         k1, k2, b: hyparameters of the score function for BM25. Default is 1.2, 100, 0.75 respectively
@@ -437,24 +431,24 @@ def calculate_score_BM25(
     K = k1 * ((1 - b) + b * passages_length / ave_length)
     
     score = 0
-    for term, tf_query_term in tf_query.items():
-        tf_passage_term = tf_passage.get(term, None)
-        if tf_passage_term is None:
+    for term, tf_unnorm_query_term in tf_unnorm_query.items():
+        tf_unnorm_passage_term = tf_unnorm_passage.get(term, None)
+        if tf_unnorm_passage_term is None:
             continue
         tf_collection_term = tf_collection[term]
 
         score += np.log(
             ((0 + 0.5) / (0 - 0 + 0.5)) / ((tf_collection_term - 0 + 0.5 ) / (num_passages - tf_collection_term - 0 + 0 + 0.5)) \
-            * ((k1 + 1) * tf_passage_term) / (K + tf_passage_term) \
-            * ((k2 + 1) * tf_query_term) / (k2 + tf_query_term)
+            * ((k1 + 1) * tf_unnorm_passage_term) / (K + tf_unnorm_passage_term) \
+            * ((k2 + 1) * tf_unnorm_query_term) / (k2 + tf_unnorm_query_term)
         )
 
     return score
 
 
 def calculate_score_discounting(
-        tf_query: dict, 
-        tf_passage: dict,
+        tf_unnorm_query: dict, 
+        tf_unnorm_passage: dict,
         passages_length: int,
         num_unique_words: int, 
         eps: float | None = 1
@@ -462,8 +456,8 @@ def calculate_score_discounting(
     '''Calculate the log score under Laplace smoothing with or without Lidstone correction for the likelihood model
 
     Args:
-        tf_query: a dict with all terms of the query as keys and tf as values
-        tf_passage: a dict with all terms of the passage as keys and tf as values
+        tf_unnorm_query: a dict with all terms of the query as keys and unnormalized tf as values
+        tf_unnorm_passage: a dict with all terms of the passage as keys and unnormalized tf as values
         passages_length: a dict with pids as keys and length of the passage as values
         num_unique_words: number of unique words in the entire collection
         eps: parammter for the smoothing method. 1 means without Lidstone correction. Default is 1.
@@ -472,25 +466,25 @@ def calculate_score_discounting(
         score: the log score
     '''
 
-    score = 0
-
-    for term, tf_query_term in tf_query.items():
-        score += tf_query_term * np.log((eps + tf_passage.get(term, 0)) / (eps * num_unique_words + passages_length))
+    score = sum([
+        tf_unnorm_query_term * np.log((eps + tf_unnorm_passage.get(term, 0)) / (eps * num_unique_words + passages_length))
+        for term, tf_unnorm_query_term in tf_unnorm_query.items()
+    ])
 
     return score
 
 
 def calculate_score_laplace(
-        tf_query: dict, 
-        tf_passage: dict,
+        tf_unnorm_query: dict, 
+        tf_unnorm_passage: dict,
         passages_length: int,
         num_unique_words: int
 ) -> float:
     """Calculate the log score with Laplace smoothing for the likelihood retrieval model
     
     Args:
-        tf_query: a dict with all terms of the query as keys and tf as values
-        tf_passage: a dict with all terms of the passage as keys and tf as values
+        tf_unnorm_query: a dict with all terms of the query as keys and unnormalized tf as values
+        tf_unnorm_passage: a dict with all terms of the passage as keys and unnormalized tf as values
         passages_length: a dict with pids as keys and length of the passage as values
         num_unique_words: number of unique words in the entire collection
 
@@ -499,8 +493,8 @@ def calculate_score_laplace(
     """
     
     return calculate_score_discounting(
-        tf_query=tf_query,
-        tf_passage=tf_passage,
+        tf_unnorm_query=tf_unnorm_query,
+        tf_unnorm_passage=tf_unnorm_passage,
         passages_length=passages_length,
         num_unique_words=num_unique_words,
         eps=1
@@ -508,8 +502,8 @@ def calculate_score_laplace(
 
 
 def calculate_score_lidstone(
-        tf_query: dict, 
-        tf_passage: dict,
+        tf_unnorm_query: dict, 
+        tf_unnorm_passage: dict,
         passages_length: int,
         num_unique_words: int, 
         eps: float | None = 0.1
@@ -517,8 +511,8 @@ def calculate_score_lidstone(
     '''Calculate the log score with Laplace smoothing and Lidstone correction for the likelihood retrieval model
 
     Args:
-        tf_query: a dict with all terms of the query as keys and tf as values
-        tf_passage: a dict with all terms of the passage as keys and tf as values
+        tf_unnorm_query: a dict with all terms of the query as keys and unnormalized tf as values
+        tf_unnorm_passage: a dict with all terms of the passage as keys and unnormalized tf as values
         passages_length: a dict with pids as keys and length of the passage as values
         num_unique_words: number of unique words in the entire collection
         eps: parammter for the smoothing method. Default is 0.1
@@ -531,8 +525,8 @@ def calculate_score_lidstone(
         warn(f'the eps {eps} is close to 1')
 
     return calculate_score_discounting(
-        tf_query=tf_query,
-        tf_passage=tf_passage,
+        tf_unnorm_query=tf_unnorm_query,
+        tf_unnorm_passage=tf_unnorm_passage,
         passages_length=passages_length,
         num_unique_words=num_unique_words,
         eps=eps
@@ -540,8 +534,8 @@ def calculate_score_lidstone(
 
 
 def calculate_score_dirichlet(
-        tf_query: dict, 
-        tf_passage: dict,
+        tf_unnorm_query: dict, 
+        tf_unnorm_passage: dict,
         tf_collection: dict,
         passages_length: int,
         length_collection: int,
@@ -550,9 +544,9 @@ def calculate_score_dirichlet(
     '''Calculate the log score under dirichlet smoothing for the likelihood model
 
     Args:
-        tf_query: a dict with all terms of the query as keys and tf as values
-        tf_passage: a dict with all terms of the passage as keys and tf as values
-        tf_collection: a dict with all terms of the collection as keys as tf for the entire collection as values
+        tf_unnorm_query: a dict with all terms of the query as keys and unnormalized tf as values
+        tf_unnorm_passage: a dict with all terms of the passage as keys and unnormalized tf as values
+        tf_collection: a dict with all terms of the collection as keys and unnormalized tf for the entire collection as values
         passages_length: a dict with pids as keys and length of the passage as values
         length_collection: number of terms in the entire collection
         mu: parammter for the smoothing method. Default is 50.
@@ -560,16 +554,13 @@ def calculate_score_dirichlet(
     Returns:
         score: the log score
     '''
-    score = 0
+
     d = passages_length
     lam = d / (d + mu)
-
-    for term, tf_query_term in tf_query.items():
-        tf_passage_term = tf_passage.get(term, None)
-        if tf_passage_term is None:
-            continue
-        score += tf_query_term * np.log(
-            lam * tf_passage_term / d + (1-lam) * tf_collection[term] / length_collection
-        )
     
-    return score
+    return sum([
+        tf_unnorm_query_term * np.log(
+        lam * tf_unnorm_passage[term] / d + (1-lam) * tf_collection[term] / length_collection
+        )
+        for term, tf_unnorm_query_term in tf_unnorm_query.items() if term in tf_unnorm_passage
+    ])

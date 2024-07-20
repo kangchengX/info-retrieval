@@ -9,29 +9,6 @@ from nltk.stem import WordNetLemmatizer
 Tag_To_Pos = {'J': 'a', 'V': 'v', 'R': 'r'}
 
 
-def count(data: Iterable, frequencies_in_dicts: bool | None = True):
-    '''Count each term in the data
-    
-    Args:
-        data: data to count
-
-    Returns:
-        result: if frequencies_in_dicts : a dict with terms as keys and frequencies as values,
-            else: a dict with terms as keys and {'tf': frequency} as values
-    '''
-
-    result = {}
-
-    if frequencies_in_dicts:
-        for term in data:
-            result[term]['tf'] = result.setdefault(term, {'tf':0})['tf'] + 1
-    else:
-        for term in data:
-            result[term] = result.get(term,0) + 1
-
-    return result
-
-
 def calculate_normalized_frequency_zipfian(
         fre : dict, 
         s : int | None = 1,

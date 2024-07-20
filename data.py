@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import re
 from functools import partial
-from utils import generate_tokens, count, Lemmatizer
+from utils import generate_tokens, Lemmatizer
 from typing import Iterable, Literal, Dict, Callable, Union
 from tqdm.auto import tqdm
 from warnings import warn
@@ -24,9 +24,9 @@ class DocPidDictView:
     '''
     def __init__(
             self, 
-            feature_name: Literal['tf','tf-idf'],
-            original: Dict[str, Dict[str, Dict[str, Dict[str, int | float]]]] | None = {},
-            pid: str | None = None,
+            feature_name: Literal['tf', 'tf-unnorm', 'tf-idf'],
+            original: Dict[str, Dict[str, Dict[str | int, Dict[str, int | float]]]] | None = {},
+            pid: str | int | None = None,
             ignore_pid_init_error: bool | None = False
     ):
         """Initilaize the class
@@ -34,12 +34,13 @@ class DocPidDictView:
         Args:
             feature_name: the passage-level feature name for the term
             original: the original dict with the structure:
-                Dict[str, Dict[str, Dict[str, Dict[str, int | float]]]], i.e.,
+                Dict[str, Dict[str, Dict[str | int, Dict[str, int | float]]]], i.e.,
                 {
                     tokens, {
                                 pids_dict : {
                                                 pids, {
-                                                          tf : int,
+                                                          tf : float,
+                                                          tf-unnorm : int,
                                                           tf-idf : float
                                                       }
                                             },
@@ -55,7 +56,7 @@ class DocPidDictView:
             raise ValueError(f'pid is not assigned a value')
         self.pid = pid
 
-    def update_pid(self, pid: str):
+    def update_pid(self, pid: str | int):
         '''Updata the pid. After updating, the view can be seen as a new dict of the passage with a simple structure {term: value}'''
         self.pid = pid
 
@@ -66,7 +67,7 @@ class DocPidDictView:
         '''
         return self.original[term]['pids_dict'][self.pid][self.feature_name]
 
-    def get(self, term: str, default: int|float| None = None):
+    def get(self, term: str, default: int | float | None = None):
         '''Get the passage-level feature value of the term. If the original dict doesn't have the term, or
         self.original[term]['pids_dict'] doesn't have the given pid, return default
         
@@ -125,31 +126,36 @@ class DocPidDictView:
             if self.pid in pids_dict:
                 yield pids_dict[self.pid][self.feature_name]
 
+    def __contains__(self, term: str):
+        '''Allows for 'in' operator. Check if the passage with the assigned pid have the given term'''
+
+        return term in self.original and self.pid in self.original[term]['pids_dict']
+
 
 class OneNestedDictView:
-    '''The class to create a dict view of a one nested dict. The dict view can be seen as {term, value},
+    '''The class to create a dict view of a one-nested dict. The dict view can be seen as {term, value},
     where term is the key of the original dict, an the value is original[term][inner_key]
     
     Attributes:
         original: the original key with shape:
-            Dict[str, Dict[str, int|float]], i.e.
+            Dict[str, Dict[str, int | float]], i.e.
             {
                 tokens, {   
-                            feature_names, int | float
+                            inner keys, int | float
                         }
             }
         key: the feature_name
     '''
     def __init__(
             self, 
-            original: Dict[str, Dict[str, int|float]],
+            original: Dict[str, Dict[str, int | float]],
             inner_key: int
     ):
         '''Initialize the class
         
         Args:
             original: the original key with shape:
-                Dict[str, Dict[str: int|float]], i.e.
+                Dict[str, Dict[str: int | float]], i.e.
                 {
                     keys, {   
                                inner keys, int | float
@@ -161,12 +167,12 @@ class OneNestedDictView:
         self.original = original
         self.inner_key = inner_key
 
-    def updata_original(self, original: Dict[str, Dict[str, int|float]]):
+    def updata_original(self, original: Dict[str, Dict[str, int | float]]):
         '''Update the original dict
         
         Args:
             original: the original key with shape:
-                Dict[str, Dict[str: int|float]], i.e.
+                Dict[str, Dict[str: int | float]], i.e.
                 {
                     keys, {   
                                inner keys, int | float
@@ -175,12 +181,12 @@ class OneNestedDictView:
         '''
         self.original = original
 
-    def __getitem__(self, term: str):
+    def __getitem__(self, key: str):
         '''Get the inner value
         
         Returns: the inner value
         '''
-        return self.original[term][self.inner_key]
+        return self.original[key][self.inner_key]
     
     def __iter__(self):
         '''Iter the keys of the original, i.e., the dict view's keys
@@ -189,14 +195,14 @@ class OneNestedDictView:
         '''
         return iter(self.original)
 
-    def get(self, term: str, default: int|float| None = None):
+    def get(self, key: str, default: int | float | None = None):
         '''Get the inner value. Return default if the orginal dict doesn't have the key, i.e.,
         the dict view doesn't have the key
         
         Returns: the inner value or default
         '''
         
-        return self.original.get(term, {}).get(self.inner_key, default)
+        return self.original.get(key, {}).get(self.inner_key, default)
 
     def keys(self):
         '''Get keys of the original, i.e. the dict view's keys
@@ -210,8 +216,8 @@ class OneNestedDictView:
         
         Returns: Iter of tuples (key, inner value)
         '''
-        for term, inner_dict in self.original.items():
-            yield term, inner_dict[self.inner_key]
+        for key, inner_dict in self.original.items():
+            yield key, inner_dict[self.inner_key]
 
     def values(self):
         '''Iter the inner values
@@ -221,13 +227,18 @@ class OneNestedDictView:
         for inner_dict in self.original.values():
             yield inner_dict[self.inner_key]
 
+    def __contains__(self, key: str):
+        '''Allows for 'in' operator'''
+
+        return key in self.original
+
 
 class DocCollectionDictView(OneNestedDictView):
     '''A dict view at the collection-level of the inverted indices
     
     Attributes:
         original: the docs dict with shape:
-            Dict[str, Dict[str, int|float]], i.e.
+            Dict[str, Dict[str, int | float]], i.e.
             {
                 tokens, {   
                             {
@@ -241,14 +252,14 @@ class DocCollectionDictView(OneNestedDictView):
     def __init__(
             self, 
             feature_name: Literal['idf', 'tf-collection'],
-            original: Dict[str, Dict[str, int|float]] | None = {}
+            original: Dict[str, Dict[str, int | float]] | None = {}
         ):
         '''Initialize the view class
         
         Args:
             feature_name: the feature name
             original: the docs dict with shape:
-                Dict[str, Dict[str: int|float]], i.e.
+                Dict[str, Dict[str: int | float]], i.e.
                 {
                     tokens, {   
                                 {
@@ -265,11 +276,12 @@ class QueryDictView(OneNestedDictView):
     
     Attributes:
         original: the query dict with shape:
-            Dict[str, Dict[str: int|float]], i.e.
+            Dict[str, Dict[str: int | float]], i.e.
             {
                 tokens, {   
                             {
-                                'tf': int,
+                                'tf': float,
+                                'tf-unnorm': int,
                                 'tf-idf': float
                             }
                         }
@@ -279,19 +291,20 @@ class QueryDictView(OneNestedDictView):
 
     def __init__(
             self,
-            feature_name: Literal['tf', 'tf-idf'],
-            original: Dict[str, Dict[str, int|float]] | None = {}
+            feature_name: Literal['tf', 'tf-unnorm', 'tf-idf'],
+            original: Dict[str, Dict[str, int | float]] | None = {}
     ):
         '''Initialize the view class
         
         Args:
             feature_name: the feature name
             original: the docs dict with shape:
-                Dict[str, Dict[str: int|float]], i.e.
+                Dict[str, Dict[str: int | float]], i.e.
                 {
                     tokens, {   
                                 {
-                                    'tf': int,
+                                    'tf': float,
+                                    'tf-unnorm': int,
                                     'tf-idf': float
                                 }
                             }
@@ -307,13 +320,14 @@ class DocLoader():
         to_tokens: fuction to tokenize the string
         num_docs: number of documents (or passage)
         inverted_indices: A complex dict with the structure:
-            Dict[str, Dict[str, Union[Dict[str, Dict[str, Union[int,float]]], float]]], i.e.,
+            Dict[str, Dict[str, Union[Dict[Union[str,int], Dict[str, Union[int,float]]], float]]], i.e.,
             {
                 tokens, {
                             pids_dict : {
                                             pids, {
-                                                      tf : int,
-                                                      tf-idf : float
+                                                     'tf': float,
+                                                     'tf-unnorm': int,
+                                                     'tf-idf': float
                                                   }
                                         },
                             idf : float,
@@ -329,7 +343,7 @@ class DocLoader():
 
     to_tokens: Callable
     num_docs: int | None
-    inverted_indices: Dict[str, Dict[str, Union[Dict[str, Dict[str, Union[int,float]]], float]]]
+    inverted_indices: Dict[str, Dict[str, Union[Dict[Union[str,int], Dict[str, Union[int,float]]], float]]]
     passages_length: dict | None
     average_length: int | None
 
@@ -388,22 +402,22 @@ class DocLoader():
         print('finish : calculate inverted indices')
         
     def _calculate_tf(self, pid_tokens: pd.Series):
-        '''For each term, calculate frequency for the passage and the frequency for the entire collection'''
+        '''For each term, calculate tf, unnormalized tf for the passage and the unnormalized frequency for the entire collection
+        
+        Args:
+            pid_tokens: pd.Series with pids as indices and lists of tokens as values
+        '''
 
-        # calculate inverted_indices[token]['pids_dict']['pid']['tf']
-        # and inverted_indices[token]['tf-collection']
         for pid, tokens in pid_tokens.items():
-            for token in tokens:
-                # get inverted_indices[token]
-                feature_collection_dict = self.inverted_indices.setdefault(token, {'pids_dict': {}})
-                # get inverted_indices[token]['pids_dict']
-                pids_dict = feature_collection_dict['pids_dict']
-                # get inverted_indices[token]['pids_dict']['pid']
-                feature_passage_dict = pids_dict.setdefault(pid, {})
-                # calculate inverted_indices[token]['pids_dict']['pid']['tf']
-                feature_passage_dict['tf'] = feature_passage_dict.get('tf', 0) + 1
-                # calculate inverted_indices[token]['tf-collection']
-                feature_collection_dict['tf-collection'] = feature_collection_dict.get('tf-collection',0) + 1
+            tokens_unique, counts = np.unique(tokens, return_counts=True)
+            for token, count in zip(tokens_unique, counts):
+                feature_collection_dict = self.inverted_indices.setdefault(token, {'pids_dict': {}, 'tf-collection': 0})
+                feature_collection_dict['tf-collection'] += count
+
+                feature_collection_dict['pids_dict'][pid] = {
+                    'tf' : count / self.passages_length[pid],
+                    'tf-unnorm' : count
+                }
 
     def _calculate_tf_idf(self):
         '''Calculate the idf for each term for the whole collection
@@ -425,12 +439,13 @@ class QueryLoader():
     Attributes:
         self.to_tokens: the tokenizer
         self.queries: A complex dict, with the following structure:
-            Dict[str, Dict[str, Dict[str, Union[int, float]]]], i.e.,
+            Dict[Union[str, int], Dict[str, Dict[str, Union[int, float]]]], i.e.,
             {
                 qids, {
                           tokens, {
-                                      tf: int,
-                                      idf: float
+                                     'tf': float,
+                                     'tf-unnorm': int,
+                                     'tf-idf': float
                                   }
                       }
             }
@@ -440,7 +455,7 @@ class QueryLoader():
     """
 
     to_tokens: Callable
-    queries: Dict[str, Dict[str, Dict[str, Union[int, float]]]]
+    queries: Dict[Union[str, int], Dict[str, Dict[str, Union[int, float]]]]
 
     def __init__(
             self, 
@@ -468,6 +483,7 @@ class QueryLoader():
             vocabulary=vocabulary
         )
         self.queries = None
+        self._calculate_tf_idf_query_partial = None
 
     def load(self, doc_loader: DocLoader, raw_data: pd.DataFrame):
         '''Load the queries and the corresponding statistics
@@ -476,21 +492,33 @@ class QueryLoader():
             doc_loader: the doc_loader containing the doc (or passages)
             raw_data: raw_data containing the columns ('qid','pid','query','passage')
         '''
+        print('start : calculate queries statistics')
+        self._calculate_tf_idf_query_partial = partial(
+            self._calculate_tf_idf_query_part,
+            doc_loader = doc_loader)
         queries_series = raw_data.drop_duplicates(subset='qid').set_index('qid')['query']
-        self._calculate_tf(queries_series)
-        self._calculate_tf_idf(doc_loader)
+        self._calculate_tf_idf(queries_series, doc_loader)
+        print('finish : calculate queries statistics')
     
-    def _calculate_tf(self, queries_series: pd.Series):
-        '''Calcualte tf of each term under each query'''
+    def _calculate_tf_idf(self, queries_series: pd.Series, doc_loader: DocLoader):
+        '''Calcualte tf, unnormalized tf, tf-idf of each term under each query'''
         # calculate queries['qid'][token]['tf']
-        self.queries = queries_series.progress_apply(self.to_tokens).apply(count).to_dict()
-
-    def _calculate_tf_idf(self, doc_loader: DocLoader):
-        '''Calculate tf-idf of each term under each query'''
-        # calcualte queries['qid'][token]['tf-idf']
-        for token_dict in self.queries.values():
-            for token, feature_dict in token_dict.items():
-                feature_dict['tf-idf'] = feature_dict['tf'] * doc_loader.inverted_indices.get(token,{}).get('idf', 0)
+        self.queries = queries_series.progress_apply(self.to_tokens).apply(self._calculate_tf_idf_query).to_dict()
+    
+    def _calculate_tf_idf_query_part(self, query_tokens: list, doc_loader: DocLoader):
+        '''Calcualte tf, unnormalized tf, tf-idf of each term for this query'''
+        tokens_unique, counts = np.unique(query_tokens, return_counts=True)
+        return {
+            token : {
+                'tf' : count / len(query_tokens),
+                'tf-unnorm': count,
+                'tf-idf': doc_loader.inverted_indices.get(token,{}).get('idf', 0) 
+            }
+            for token, count in zip(tokens_unique, counts)
+        }
+    
+    def _calculate_tf_idf_query(self, query_tokens: list):
+        return self._calculate_tf_idf_query_partial(query_tokens)
 
 
 class DataLoader():
@@ -548,7 +576,7 @@ def extract_passage_embedding(doc_loader: DocLoader, word_embedding: KeyedVector
     for term, feature_collection_dict in inverted_indices.items():
         word_vector = word_embedding[term] if term in word_embedding else zero_vector
         for pid, feature_passage_dict in feature_collection_dict['pids_dict'].items():
-            passage_embedding[pid] = passage_embedding.get(pid, zero_vector) + feature_passage_dict['tf'] * word_vector
+            passage_embedding[pid] = passage_embedding.get(pid, zero_vector) + feature_passage_dict['tf-unnorm'] * word_vector
     
     # average the vectors
     passage_embedding = {pid: sum_vector / passages_length[pid] 
@@ -574,7 +602,7 @@ def extract_query_embedding(query_loader: QueryLoader, word_embedding: KeyedVect
     query_embedding =  {
         qid: np.mean(
             [
-                word_embedding[term] * feature_dict['tf']
+                word_embedding[term] * feature_dict['tf-unnorm']
                 if term in word_embedding else zero_vector
                 for term, feature_dict in term_dict.items()
             ],
