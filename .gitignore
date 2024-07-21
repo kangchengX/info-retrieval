@@ -2,4 +2,3 @@
 *.tsv
 __pycache__/
 data/
-*.ipynb

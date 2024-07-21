@@ -385,6 +385,7 @@ class DocLoader():
         Args:
             raw_data: queries and passages (or documents), with row (pid,qid,query,passage)
         '''
+        print('start : loading data for passages')
         # generate Series with pid as index and passage as values
         raw_data_series = raw_data.drop_duplicates('pid').set_index('pid')['passage']
         # convert passage string to list of tokens for each passage
@@ -400,6 +401,8 @@ class DocLoader():
         self._calculate_tf(pids_tokens)
         self._calculate_tf_idf()
         print('finish : calculate inverted indices')
+
+        print('finish: loading data for passages')
         
     def _calculate_tf(self, pid_tokens: pd.Series):
         '''For each term, calculate tf, unnormalized tf for the passage and the unnormalized frequency for the entire collection
@@ -492,13 +495,13 @@ class QueryLoader():
             doc_loader: the doc_loader containing the doc (or passages)
             raw_data: raw_data containing the columns ('qid','pid','query','passage')
         '''
-        print('start : calculate queries statistics')
+        print('start : loading data for queries')
         self._calculate_tf_idf_query_partial = partial(
             self._calculate_tf_idf_query_part,
             doc_loader = doc_loader)
         queries_series = raw_data.drop_duplicates(subset='qid').set_index('qid')['query']
         self._calculate_tf_idf(queries_series, doc_loader)
-        print('finish : calculate queries statistics')
+        print('finish : loading data for queries')
     
     def _calculate_tf_idf(self, queries_series: pd.Series, doc_loader: DocLoader):
         '''Calcualte tf, unnormalized tf, tf-idf of each term under each query'''
@@ -634,11 +637,10 @@ def extract_features(
         concatenate: If true, concatenate the query vector and the passage_vector
 
     Returns:
-        features: dataframe with columns ('qid','pid','features') if concatenate,
+        features: dataframe that include columns ('qid','pid','features') if concatenate,
             with columns ('qid', 'pid', 'query_vector', 'passage_vector' if not concatenate),
             where each row of 'features', 'query_vector', or 'passage_vector' is a 1-d array
     """
-    query_candidate = query_candidate[['qid','pid']]
     passage_embedding = extract_passage_embedding(data_loader.doc_loader, word_embedding)
     query_embedding = extract_query_embedding(data_loader.query_loader, word_embedding)
 
@@ -651,7 +653,7 @@ def extract_features(
             axis = 1
         )
         features['features'] = list(vectors)
-        features = features[['qid','pid','features']]
+        features = features.drop(columns=['query_vector', 'passage_vector'])
 
     if filename is not None:
         features.to_csv(filename)

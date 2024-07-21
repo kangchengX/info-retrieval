@@ -160,8 +160,8 @@ def cal_metrics(results: pd.DataFrame, qid_pid_relevance: pd.DataFrame | None = 
         results: retrival resutls, (qid,pid,score,relevancy) or (qid,pid,score)
         qid_pid_relevances: true relevance, (qid,pid,relevancy)
 
-    Return:
-        mean_ap : mean of the average precision
+    Returns:
+        mean_ap: mean of the average precision
         ndcg: ndcg value
     '''
 

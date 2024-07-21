@@ -99,18 +99,20 @@ class LogisticRegression(RetrieveBaseModel):
         return self.forward(inputs)
     
 
-class ReXGBRanker(xgb.XGBRanker, RetrieveBaseModel):
-    '''The XGB ranker Retrieval Model'''
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def predict(self, inputs: np.ndarray) -> np.ndarray:
-        '''Get the prediction of the model
+class LambdaMART(xgb.XGBRanker, RetrieveBaseModel):
+    '''The LambdaMART Retrieval Model'''
+    def __init__(self, max_depth: int, n_estimators: int, **kwargs):
+        '''Initialize the model
         
         Args:
-            inputs: inputs of the model
+            learning_rate, max_depth, n_estimators
         '''
-        return self.predict(inputs)
+        super().__init__(
+            objective='rank:pairwise', 
+            max_depth=max_depth,
+            n_estimators=n_estimators,
+            **kwargs
+        )
     
 
 class MLP(nn.Module, RetrieveBaseModel):
@@ -175,7 +177,7 @@ class Trainer:
     '''
     def __init__(
             self,
-            model: Union[LogisticRegression, MLP, ReXGBRanker],
+            model: Union[LogisticRegression, MLP, LambdaMART],
             data: pd.DataFrame
     ):
         '''Initialize the model
@@ -188,13 +190,13 @@ class Trainer:
         self.data = data
         self.train_lag = False
 
-    def get_model(self) -> Union[LogisticRegression, MLP, ReXGBRanker]:
+    def get_model(self) -> Union[LogisticRegression, MLP, LambdaMART]:
         '''Get the 'trained' model'''
         if not self.train_lag:
             warn('the model has not been trained yet')
         return self.model
     
-    def reset_model(self, model: Union[LogisticRegression, MLP, ReXGBRanker]):
+    def reset_model(self, model: Union[LogisticRegression, MLP, LambdaMART]):
         '''Reset the model to train'''
         self.model = model
         self.train_lag = False
@@ -202,11 +204,11 @@ class Trainer:
     def train(self, **kwargs):
         '''Train the model'''
         self.train_lag = True
-        if isinstance(LogisticRegression, self.model):
+        if isinstance(self.model, LogisticRegression):
             self.train_lr(**kwargs)
-        elif isinstance(MLP, self.model):
+        elif isinstance(self.model, MLP):
             self.train_mlp(**kwargs)
-        elif isinstance(ReXGBRanker):
+        elif isinstance(self.model, LambdaMART):
             self.train_lm(**kwargs)
         else:
             raise AttributeError('Unsupported model class')
@@ -270,13 +272,13 @@ class Trainer:
         return losses_epoch
 
     def train_lm(self, learning_rate: float | None = None):
-        '''Train the XGB Ranker Model
+        '''Train the LambdaMART Model
         
         Args:
             learning_rate: learning rate of the training. If None, use the default learning rate
         '''
 
-        print('start: train the XGB ranker model')
+        print('start: train the LambdaMART model')
         if learning_rate is not None:
             self.model.set_params(learning_rate=learning_rate)
         # prepare data
@@ -287,7 +289,7 @@ class Trainer:
 
         self.model.fit(x_train, y_train, group=group_counts)
 
-        print('finish: train the XGB ranker model')
+        print('finish: train the LambdaMART model')
 
 
     def train_mlp(self, batch_size, epoch, learning_rate):
@@ -362,6 +364,15 @@ class LearningRetriever:
 
         return results
 
+    def reset_model(self, model: RetrieveBaseModel):
+        '''reset the model
+        
+        Args: 
+            model: the model
+        '''
+
+        self.model = model
+
     def _calculate_score(self):
         x = np.stack(self.data['features'].values)
         score_df = self.data[['pid','qid','relevancy']]
@@ -369,7 +380,7 @@ class LearningRetriever:
 
         return score_df
     
-    def _retrieve_from_score(score_df: pd.DataFrame, num_top_results: int | None = None):
+    def _retrieve_from_score(self, score_df: pd.DataFrame, num_top_results: int | None = None):
         '''Generate retrieval results. Get the num_top_results for each query if num_top_results is not None.
         
         Args:
