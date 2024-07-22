@@ -14,19 +14,20 @@ def calculate_normalized_frequency_zipfian(
         s : int | None = 1,
         return_difference : bool | None = True
 ) -> Tuple[np.ndarray, np.ndarray, float] | Tuple[np.ndarray, np.ndarray]:
-    '''Calculate the normalized frequencies and the zipfian value as well as their difference
+    """
+    Calculate the normalized frequencies and the zipfian value as well as their difference.
 
     Args:
-        fre: a dict representing the (unnormalized) frequencies of the terms 
-        s: parameter of zipfian distribution
-        return_difference : If true, return the difference between the normalized frequencies and the zipfian value,
-            defined as the mean of the l2 norm
-    
+        fre (dict): A dictionary representing the (unnormalized) frequencies of the terms.
+        s (float): Parameter of the zipfian distribution.
+        return_difference (bool): If True, return the difference between the normalized frequencies and 
+            the zipfian value, defined as the mean of the L2 norm. Defaults to False.
+
     Returns:
-        fre_norm: normalized frequencies with descending order
-        zipfian: zipfian value with descending order
-        diff: difference between the two distributions if return_difference is True
-    '''
+        fre_norm (list): Normalized frequencies in descending order.
+        zipfian (list): Zipfian values in descending order.
+        diff (float, optional): Difference between the two distributions if return_difference is True.
+    """
 
     fre_sorted = sorted(fre.items(),key = lambda item:item[1],reverse= True)
     fre_norm = np.array([v for _,v in fre_sorted])
@@ -45,6 +46,18 @@ def calculate_normalized_frequency_zipfian(
 
 
 class Lemmatizer:
+    """
+    This Python class initializes a lemmatizer with an option to use caching for improved performance.
+    
+    Args:
+        use_cache (bool): The `use_cache` parameter in the `__init__` method is a boolean parameter that
+            determines whether caching should be used for lemmatization. If `use_cache` is set to `True`, the
+            lemmatization results will be cached using an LRU cache with a specified size. Defaults to True.
+        cache_size (int): The `cache_size` parameter in the `__init__` method represents the maximum number of
+            items that can be stored in the cache when caching is enabled (`use_cache=True`). This parameter
+            determines the size of the cache and specifies how many recent function calls and their results will
+            be stored for faster retrieval. Defaults to 10000.
+    """
     def __init__(self, use_cache=True, cache_size=10000):
         self.use_cache = use_cache
         self.lemmatizer = WordNetLemmatizer()
@@ -55,6 +68,21 @@ class Lemmatizer:
             self._lemmatize = self._lemmatize_uncached
 
     def _lemmatize_uncached(self, word:str, pos:str | None = 'n'):
+        """
+        The function `_lemmatize_uncached` takes a word and its part of speech (POS) as input and returns
+        the lemmatized form of the word using a lemmatizer.
+        
+        Args:
+            word (str): The `word` parameter in the `_lemmatize_uncached` method is a string that represents
+                the word to be lemmatized.
+            pos (str): The `pos` parameter in the `_lemmatize_uncached` method is used to specify the
+                part of speech of the word being lemmatized. It is an optional parameter with a default value of
+                'n', which stands for noun. This parameter allows you to specify the part of speech. Defaults to n
+        
+        Returns:
+          The `_lemmatize_uncached` method is returning the lemmatized form of the input `word` with the
+        specified part of speech `pos` using the lemmatizer.
+        """
         return self.lemmatizer.lemmatize(word, pos)
 
     def lemmatize(self, word:str, pos:str | None = 'n'):
