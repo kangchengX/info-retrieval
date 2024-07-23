@@ -12,16 +12,17 @@ from gensim.models import KeyedVectors
 tqdm.pandas()
 
 class DocPidDictView:
-    '''The class to create a dict view of the original dict at a doc (or passage) level given the pid. 
+    """
+    Creates a dict view of the original dict at a doc (or passage) level given the pid. 
     The dict view can be seen as a dict of a doc (or passage) with structure {term: value}, where term is the term of this 
     doc (or passage), and the value is the doc-level (or passage-level) feature for the term. 
     Specifically, term is the key of the original dict whose ['pids_dict'] has the assigned 'pid', and value is original[term]['pids_dict'][pid][key]
         
-    Atrributes:
-        original: the original dict
-        key: the key of the deepest dictionary
-        pid: the passage id      
-    '''
+    Attributes:
+        original (dict): the original dict
+        key (str): the key of the deepest dictionary
+        pid (str | int): the passage id      
+    """
     def __init__(
             self, 
             feature_name: Literal['tf', 'tf-unnorm', 'tf-idf'],
@@ -29,11 +30,12 @@ class DocPidDictView:
             pid: str | int | None = None,
             ignore_pid_init_error: bool | None = False
     ):
-        """Initilaize the class
+        """
+        Initilaize the class
         
         Args:
-            feature_name: the passage-level feature name for the term
-            original: the original dict with the structure:
+            feature_name (str): the passage-level feature name for the term
+            original (dict): the original dict with the structure:
                 Dict[str, Dict[str, Dict[str | int, Dict[str, int | float]]]], i.e.,
                 {
                     tokens, {
@@ -46,9 +48,9 @@ class DocPidDictView:
                                             },
                             }
                 }
-                , default is {}
-            pid: the pid of the dict. Default is None
-            ignore_pid_init_error: If False, an error will be raised if pid is not assigned a value in initialization
+                . Default to {}.
+            pid (str): the pid of the dict. Default to None.
+            ignore_pid_init_error (bool): If False, an error will be raised if pid is not assigned a value in initialization. Default to False.
         """
         self.original = original
         self.feature_name = feature_name
@@ -57,54 +59,76 @@ class DocPidDictView:
         self.pid = pid
 
     def update_pid(self, pid: str | int):
-        '''Updata the pid. After updating, the view can be seen as a new dict of the passage with a simple structure {term: value}'''
+        """
+        Updata the pid. After updating, the view can be seen as a new dict of the passage with a simple structure {term: value}
+
+        Args:
+            pid (str | int): the passage id to update
+        """
         self.pid = pid
 
     def __getitem__(self, term: str):
-        '''Get the passage-level feature value of the term
+        """
+        Get the passage-level feature value of the term
         
-        Returns: the passage-level feature value
-        '''
+        Args:
+            term (str): the term of which the passage-level feature will be accessed
+
+        Returns: 
+            the passage-level feature value
+        """
         return self.original[term]['pids_dict'][self.pid][self.feature_name]
 
     def get(self, term: str, default: int | float | None = None):
-        '''Get the passage-level feature value of the term. If the original dict doesn't have the term, or
+        """
+        Get the passage-level feature value of the term. If the original dict doesn't have the term, or
         self.original[term]['pids_dict'] doesn't have the given pid, return default
         
-        Returns: the passage-level feature value or the default
-        '''
+        Args:
+            term (str): the term of which the passage-level feature will be accessed.
+            default (int | float | None): the value to return if the passage-level feature doesn't exist
+
+        Returns: 
+            the passage-level feature value or the default
+        """
         return self.original.get(term, {}).get('pids_dict', {}).get(self.pid, {}).get(self.feature_name, default)
         
     def __iter__(self):
-        '''Iter the dict view keys. This is depreciated, since the structure of the original dict, i.e., 'inverted indices' is
+        """
+        Iter the dict view keys. This is depreciated, since the structure of the original dict, i.e., 'inverted indices' is
         designed for getting the passage-level feature value from terms at a collection-level efficiently. And the set of keys
         to access are determined from another variable (like a query) for a high efficiency.
 
-        Returns: set of terms whose 'pids_dict' has the given pid
-        '''
+        Returns: 
+            set of terms whose 'pids_dict' has the given pid
+        """
         
         warn('This is depreciated. Please use a sperate set from this dict to determine the keys to access')
         return (term for term in self.original if self.pid in self.original[term]['pids_dict'])
 
     def keys(self):
-        '''Get the dict view keys (i.e. term of the passage with the assigned pid). This is depreciated, 
+        """
+        Get the dict view keys (i.e. term of the passage with the assigned pid). This is depreciated, 
         since the structure of the original dict i.e. 'inverted indices' is
         designed for getting the passage-level feature value from terms at a collection-level efficiently. And the set of keys
         to access are determined from another variable (like a query) for a high efficiency.
 
-        Returns: set of term of the passage with the assigned pid
-        '''
+        Returns: 
+            set of term of the passage with the assigned pid
+        """
 
         warn('This is depreciated. Please use a sperate set from this dict to determine the keys to access')
         return (term for term in self.original if self.pid in self.original[term]['pids_dict'])
 
     def items(self):
-        '''Get the dict view keys and values. This is depreciated, since the structure of the original dict i.e. 'inverted indices' is
+        """
+        Get the dict view keys and values. This is depreciated, since the structure of the original dict i.e. 'inverted indices' is
         designed for getting the passage-level feature value from terms at a collection-level efficiently. And the set of keys
         to access are determined from another variable (like a query) for a high efficiency.
 
-        Returns: iter of (term, value) where term is the term of the passage with the assigned pid, value is the corresponding passage-level feature value
-        '''
+        Returns: 
+            iter of (term, value) where term is the term of the passage with the assigned pid, value is the corresponding passage-level feature value
+        """
 
         warn('This is depreciated. Please use a sperate set from this dict to determine the keys to access')
         for term, feature_collection_dict in self.original.items():
@@ -113,12 +137,13 @@ class DocPidDictView:
                 yield term, pids_dict[self.pid][self.feature_name]
 
     def values(self):
-        '''Get the dict view keys and values. This is depreciated, since the structure of the original dict i.e. 'inverted indices' is
+        """
+        Get the dict view keys and values. This is depreciated, since the structure of the original dict i.e. 'inverted indices' is
         aimed for getting the passage-level feature value from the terms in a collection-level efficiently. And the set of keys
         to assess are determined from another variable (like a query)
 
         Returns: iter passage-level feature value of the given pid
-        '''
+        """
 
         warn('This is depreciated. Please use a sperate set from this dict to determine the terms to use')
         for feature_collection_dict in self.original.values():
@@ -127,34 +152,43 @@ class DocPidDictView:
                 yield pids_dict[self.pid][self.feature_name]
 
     def __contains__(self, term: str):
-        '''Allows for 'in' operator. Check if the passage with the assigned pid have the given term'''
+        """Allows for 'in' operator. Check if the passage with the assigned pid have the given term
+        
+        Args:
+            term (str): the term of which the passage-level value will be checked
+
+        Returns:
+            True of the passage-level value exists
+        """
 
         return term in self.original and self.pid in self.original[term]['pids_dict']
 
 
 class OneNestedDictView:
-    '''The class to create a dict view of a one-nested dict. The dict view can be seen as {term, value},
+    """
+    Creates a dict view of a one-nested dict. The dict view can be seen as {term, value},
     where term is the key of the original dict, an the value is original[term][inner_key]
     
     Attributes:
-        original: the original key with shape:
+        original (dict): the original key with shape:
             Dict[str, Dict[str, int | float]], i.e.
             {
                 tokens, {   
                             inner keys, int | float
                         }
             }
-        key: the feature_name
-    '''
+        inner_key (str): the inner key
+    """
     def __init__(
             self, 
             original: Dict[str, Dict[str, int | float]],
             inner_key: int
     ):
-        '''Initialize the class
+        """
+        Initialize the class
         
         Args:
-            original: the original key with shape:
+            original (dict): the original key with shape:
                 Dict[str, Dict[str: int | float]], i.e.
                 {
                     keys, {   
@@ -162,82 +196,103 @@ class OneNestedDictView:
                           }
                 }
                 
-            inner_key: the key for the inner (deepest) dict
-        '''
+            inner_key (str): the key for the inner (deepest) dict
+        """
         self.original = original
         self.inner_key = inner_key
 
     def updata_original(self, original: Dict[str, Dict[str, int | float]]):
-        '''Update the original dict
+        """
+        Update the original dict
         
         Args:
-            original: the original key with shape:
+            original (dict): the original key with shape:
                 Dict[str, Dict[str: int | float]], i.e.
                 {
                     keys, {   
                                inner keys, int | float
                           }
                 }
-        '''
+        """
         self.original = original
 
     def __getitem__(self, key: str):
-        '''Get the inner value
+        """
+        Get the inner value
         
-        Returns: the inner value
-        '''
+        Returns: 
+            the inner value
+        """
         return self.original[key][self.inner_key]
     
     def __iter__(self):
-        '''Iter the keys of the original, i.e., the dict view's keys
+        """
+        Iter the keys of the original, i.e., the dict view's keys
         
-        Returns: iter of the keys
-        '''
+        Returns: 
+            iter of the keys
+        """
         return iter(self.original)
 
     def get(self, key: str, default: int | float | None = None):
-        '''Get the inner value. Return default if the orginal dict doesn't have the key, i.e.,
+        """
+        Get the inner value. Return default if the orginal dict doesn't have the key, i.e.,
         the dict view doesn't have the key
         
-        Returns: the inner value or default
-        '''
+        Returns: 
+            the inner value or default
+        """
         
         return self.original.get(key, {}).get(self.inner_key, default)
 
     def keys(self):
-        '''Get keys of the original, i.e. the dict view's keys
+        """
+        Get keys of the original, i.e. the dict view's keys
         
-        Return: keys of the original dict
-        '''
+        Return: 
+            keys of the original dict
+        """
         return self.original.keys()
 
     def items(self):
-        '''Iter the keys of the original dict and inner values
+        """
+        Iter the keys of the original dict and inner values
         
-        Returns: Iter of tuples (key, inner value)
-        '''
+        Returns: 
+            Iter of tuples (key, inner value)
+        """
         for key, inner_dict in self.original.items():
             yield key, inner_dict[self.inner_key]
 
     def values(self):
-        '''Iter the inner values
+        """
+        Iter the inner values
         
-        Returns: Iter of inner values
-        '''
+        Returns: 
+            Iter of inner values
+        """
         for inner_dict in self.original.values():
             yield inner_dict[self.inner_key]
 
     def __contains__(self, key: str):
-        '''Allows for 'in' operator'''
+        """Allows for 'in' operator
+        
+        Args:
+            key (str): key of the original
+
+        Returns:
+            True if the original dict has the key
+        """
 
         return key in self.original
 
 
 class DocCollectionDictView(OneNestedDictView):
-    '''A dict view at the collection-level of the inverted indices
+    """
+    A dict view at the collection-level of the inverted indices
     
     Attributes:
-        original: the docs dict with shape:
+        original (dict): the docs dict with shape:
             Dict[str, Dict[str, int | float]], i.e.
             {
                 tokens, {   
@@ -247,18 +302,19 @@ class DocCollectionDictView(OneNestedDictView):
                             }
                         }
             }
-        feature_name: the feature name
-    '''
+        feature_name (str): the feature name
+    """
     def __init__(
             self, 
             feature_name: Literal['idf', 'tf-collection'],
             original: Dict[str, Dict[str, int | float]] | None = {}
         ):
-        '''Initialize the view class
+        """
+        Initialize the view class
         
         Args:
-            feature_name: the feature name
-            original: the docs dict with shape:
+            feature_name (str): the feature name
+            original (dict): the docs dict with shape:
                 Dict[str, Dict[str: int | float]], i.e.
                 {
                     tokens, {   
@@ -268,14 +324,15 @@ class DocCollectionDictView(OneNestedDictView):
                                 }
                             }
                 }
-        '''
+        """
         super().__init__(original=original, inner_key=feature_name)
 
 class QueryDictView(OneNestedDictView):
-    '''A dict view of the query for the assigned feature
+    """
+    A dict view of the query for the assigned feature
     
     Attributes:
-        original: the query dict with shape:
+        original (dict): the query dict with shape:
             Dict[str, Dict[str: int | float]], i.e.
             {
                 tokens, {   
@@ -286,19 +343,20 @@ class QueryDictView(OneNestedDictView):
                             }
                         }
             }
-        feature_name: the feature name
-    '''
+        feature_name (str): the feature name
+    """
 
     def __init__(
             self,
             feature_name: Literal['tf', 'tf-unnorm', 'tf-idf'],
             original: Dict[str, Dict[str, int | float]] | None = {}
     ):
-        '''Initialize the view class
+        """
+        Initialize the view class
         
         Args:
-            feature_name: the feature name
-            original: the docs dict with shape:
+            feature_name (str): the feature name
+            original (dict): the docs dict with shape:
                 Dict[str, Dict[str: int | float]], i.e.
                 {
                     tokens, {   
@@ -309,17 +367,18 @@ class QueryDictView(OneNestedDictView):
                                 }
                             }
                 }
-        '''
+        """
         super().__init__(original=original, inner_key= feature_name)
 
 
 class DocLoader():
-    '''Class to load docs (or passages)
+    """
+    Class to load docs (or passages)
 
     Attributes:
-        to_tokens: fuction to tokenize the string
-        num_docs: number of documents (or passage)
-        inverted_indices: A complex dict with the structure:
+        to_tokens (Callable): fuction to tokenize the string
+        num_docs (int | None): number of documents (or passage)
+        inverted_indices (dict): A complex dict with the structure:
             Dict[str, Dict[str, Union[Dict[Union[str,int], Dict[str, Union[int,float]]], float]]], i.e.,
             {
                 tokens, {
@@ -334,12 +393,9 @@ class DocLoader():
                             tf-collection : int
                         }
             }
-        passages_length: dict with pids as keys and length as values
-        average_length: average length of the passages (docs)
-
-    Methods:
-        load: load the documents (or passages)
-    '''
+        passages_length (dict): dict with pids as keys and length as values
+        average_length (int | None): average length of the passages (docs)
+    """
 
     to_tokens: Callable
     num_docs: int | None
@@ -351,19 +407,24 @@ class DocLoader():
             self,
             pattern : re.Pattern | None = re.compile(r'[^a-zA-Z\s]'), 
             lemmatizer: Lemmatizer | None = None, 
-            stopwords : Iterable | None = None, 
+            stopwords : # The above code is a comment in Python. Comments are used to provide
+            # explanations or notes within the code and are not executed by the Python
+            # interpreter. In this case, the comment is indicating that the code below it
+            # is an iterable.
+            Iterable | None = None, 
             vocabulary : Iterable | None = None
     ):
-        """Initialize the class
+        """
+        Initialize the class
         
         Args:
-            pattern: the Pattern in re. Default is re.compile(r'[^a-zA-Z\\s]').
-            lemmatizer: the lemmatizer to lemmatize the tokens. If None, not lemmatize.
-                Default is None
-            stopwords: words to remove. If None, keep all tokens.
-                Default is None
-            vocabulary: words to keep. If none, keep all tokens.
-                Default is None
+            pattern (Pattern): the Pattern in re. Default to re.compile(r'[^a-zA-Z\\s]').
+            lemmatizer (Lemmatizer): the lemmatizer to lemmatize the tokens. If None, not lemmatize.
+                Default to None
+            stopwords (Iterable | None): words to remove. If None, keep all tokens.
+                Default to None
+            vocabulary (Iterable | None): words to keep. If none, keep all tokens.
+                Default to None
         """
 
         self.to_tokens = partial(
@@ -405,11 +466,12 @@ class DocLoader():
         print('finish: loading data for passages')
         
     def _calculate_tf(self, pid_tokens: pd.Series):
-        '''For each term, calculate tf, unnormalized tf for the passage and the unnormalized frequency for the entire collection
+        """
+        For each term, calculate tf, unnormalized tf for the passage and the unnormalized frequency for the entire collection
         
         Args:
-            pid_tokens: pd.Series with pids as indices and lists of tokens as values
-        '''
+            pid_tokens (Series): pd.Series with pids as indices and lists of tokens as values
+        """
 
         for pid, tokens in pid_tokens.items():
             tokens_unique, counts = np.unique(tokens, return_counts=True)
@@ -423,9 +485,7 @@ class DocLoader():
                 }
 
     def _calculate_tf_idf(self):
-        '''Calculate the idf for each term for the whole collection
-        as well as tf-idf for each term for the passage.
-        '''
+        """Calculate the idf for each term for the whole collection as well as tf-idf for each term for the passage."""
 
         for feature_collection_dict in self.inverted_indices.values():
             pids_dict = feature_collection_dict['pids_dict']
@@ -437,11 +497,12 @@ class DocLoader():
 
 
 class QueryLoader():
-    """The query loader
+    """
+    The query loader
     
     Attributes:
-        self.to_tokens: the tokenizer
-        self.queries: A complex dict, with the following structure:
+        self.to_tokens (Callable): the tokenizer
+        self.queries (dict): A complex dict, with the following structure:
             Dict[Union[str, int], Dict[str, Dict[str, Union[int, float]]]], i.e.,
             {
                 qids, {
@@ -467,16 +528,17 @@ class QueryLoader():
             stopwords: Iterable | None = None, 
             vocabulary: Iterable | None = None
     ):
-        """Initialize the class
+        """
+        Initialize the class
         
         Args:
-            pattern: the Pattern in re. Default is re.compile(r'[^a-zA-Z\\s]').
-            lemmatizer: the lemmatizer to lemmatize the tokens. If None, not lemmatize.
-                Default is None
-            stopwords: words to remove. If None, keep all tokens.
-                Default is None
-            vocabulary: words to keep. If none, keep all tokens.
-                Default is None
+            pattern (Pattern): the Pattern in re. Default to re.compile(r'[^a-zA-Z\\s]').
+            lemmatizer (Lemmatizer): the lemmatizer to lemmatize the tokens. If None, not lemmatize.
+                Default to None
+            stopwords (Iterable | None): words to remove. If None, keep all tokens.
+                Default to None
+            vocabulary (Iterable | None): words to keep. If none, keep all tokens.
+                Default to None
         """
         self.to_tokens = partial(
             generate_tokens, 
@@ -489,12 +551,13 @@ class QueryLoader():
         self._calculate_tf_idf_query_partial = None
 
     def load(self, doc_loader: DocLoader, raw_data: pd.DataFrame):
-        '''Load the queries and the corresponding statistics
+        """
+        Load the queries and the corresponding statistics
         
         Args:
-            doc_loader: the doc_loader containing the doc (or passages)
-            raw_data: raw_data containing the columns ('qid','pid','query','passage')
-        '''
+            doc_loader (DocLoader): the doc_loader containing the doc (or passages)
+            raw_data (DataFrame): raw_data containing the columns ('qid','pid','query','passage')
+        """
         print('start : loading data for queries')
         self._calculate_tf_idf_query_partial = partial(
             self._calculate_tf_idf_query_part,
@@ -503,8 +566,8 @@ class QueryLoader():
         self._calculate_tf_idf(queries_series, doc_loader)
         print('finish : loading data for queries')
     
-    def _calculate_tf_idf(self, queries_series: pd.Series, doc_loader: DocLoader):
-        '''Calcualte tf, unnormalized tf, tf-idf of each term under each query'''
+    def _calculate_tf_idf(self, queries_series: pd.Series):
+        """Calcualte tf, unnormalized tf, tf-idf of each term under each query"""
         # calculate queries['qid'][token]['tf']
         self.queries = queries_series.progress_apply(self.to_tokens).apply(self._calculate_tf_idf_query).to_dict()
     
@@ -525,7 +588,8 @@ class QueryLoader():
 
 
 class DataLoader():
-    """The loader to load the queries and documents (or passages)
+    """
+    The loader to load the queries and documents (or passages)
     
     Attribute:
         doc_loader (DocLoader): loader of the documents (or passages)
@@ -535,7 +599,8 @@ class DataLoader():
         load: load the data
     """
     def __init__(self, **kwargs):
-        """Initialize the class
+        """
+        Initialize the class
         
         Args:
             pattern: the Pattern in re. Default is re.compile(r'[^a-zA-Z\\s]').
@@ -552,7 +617,11 @@ class DataLoader():
         self.lemmatizer = kwargs.get('lemmatizer', None)
 
     def load(self, raw_data: pd.DataFrame):
-        '''Load the data set as well as statistics'''
+        """
+        Load the data set as well as statistics
+        
+        raw_data (DataFrame)
+        """
         self.query_candidate = raw_data[['qid', 'pid']]
         self.doc_loader.load(raw_data)
         self.query_loader.load(doc_loader=self.doc_loader, raw_data=raw_data)
@@ -561,15 +630,16 @@ class DataLoader():
 
 
 def extract_passage_embedding(doc_loader: DocLoader, word_embedding: KeyedVectors):
-    '''Extract passage vector embedding for each passage
+    """
+    Extract passage vector embedding for each passage
     
     Args:
-        doc_loader: the loader containing the passages
-        word_embedding: a object mapping the word to the vector
+        doc_loader (DocLoader): the loader containing the passages
+        word_embedding (KeyedVectors):  a object mapping the word to the vector
 
     Returns:
-        passage_embedding: DataFrame with columns ('pid', 'vector')
-    '''
+        passage_embedding (DataFrame): DataFrame with columns ('pid', 'vector')
+    """
     inverted_indices = doc_loader.inverted_indices
     passages_length = doc_loader.passages_length
     zero_vector = np.zeros(len(word_embedding['like']), dtype=word_embedding['like'].dtype)
@@ -591,15 +661,16 @@ def extract_passage_embedding(doc_loader: DocLoader, word_embedding: KeyedVector
 
 
 def extract_query_embedding(query_loader: QueryLoader, word_embedding: KeyedVectors):
-    '''Extract query vector embedding for each query
+    """
+    Extract query vector embedding for each query
     
     Args:
-        query_loader: the loader containing the queries
-        word_embedding: an object mapping the word to the vector
+        query_loader (QueryLoader): the loader containing the queries
+        word_embedding (KeyedVectors): an object mapping the word to the vector
 
     Returns:
-        query_embedding: DataFrame with columns ('qid', 'vector')
-    '''
+        query_embedding (DataFrame): DataFrame with columns ('qid', 'vector')
+    """
     zero_vector = np.zeros(len(word_embedding['like']), dtype=word_embedding['like'].dtype)
     queries = query_loader.queries
     query_embedding =  {
@@ -626,18 +697,19 @@ def extract_features(
         filename: str | None = None,
         concatenate: bool | None = True
 ):
-    """Extract feature representation for the query-passage pair. Use inverted indices in data_loader
+    """
+    Extract feature representation for the query-passage pair. Use inverted indices in data_loader
     to improve efficiency. 
     
     Args:
-        data_loader: the data loader containing the passages and queris
-        word_embedding: an object mapping the word to the vector
-        query_candidate: DataFrame which mush include columns (qid, pid)
-        filename: filename to save the features. If None, not save the features
-        concatenate: If true, concatenate the query vector and the passage_vector
+        data_loader (DataLoader): the data loader containing the passages and queris.
+        word_embedding (KeyedVectors): an object mapping the word to the vector.
+        query_candidate (pd.DateFrame): DataFrame which mush include columns (qid, pid).
+        filename (str | None): filename to save the features. If None, not save the features. Default to None.
+        concatenate (bool | None): If true, concatenate the query vector and the passage_vector. Default to True.
 
     Returns:
-        features: dataframe that include columns ('qid','pid','features') if concatenate,
+        features (DataFrame): dataframe that include columns ('qid','pid','features') if concatenate,
             with columns ('qid', 'pid', 'query_vector', 'passage_vector' if not concatenate),
             where each row of 'features', 'query_vector', or 'passage_vector' is a 1-d array
     """
