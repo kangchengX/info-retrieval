@@ -35,10 +35,10 @@ class Scorer:
     '''
 
     def __init__(
-            self,
-            data_loader: DataLoader,
-            score_type: Literal['tf-idf', 'bm25', 'laplace', 'lidstone', 'dirichlet'],
-            **kwargs
+        self,
+        data_loader: DataLoader,
+        score_type: Literal['tf-idf', 'bm25', 'laplace', 'lidstone', 'dirichlet'],
+        **kwargs
     ):
         """Initialize the model.
         
@@ -80,9 +80,9 @@ class Scorer:
         return self.score_funct(qid=qid, pid=pid)
     
     def reset_score_type(
-            self,
-            score_type: Literal['tf-idf', 'bm25', 'laplace', 'lidstone', 'dirichlet'],
-            **kwargs
+        self,
+        score_type: Literal['tf-idf', 'bm25', 'laplace', 'lidstone', 'dirichlet'],
+        **kwargs
     ):
         '''Reset the score type
         
@@ -224,11 +224,11 @@ class Scorer:
 
 class TraditionRetriever():
     def __init__(
-            self,
-            data_loader: DataLoader,
-            retrieve_type: Literal['tf-idf', 'bm25', 'likelihood'],
-            smooth_type: Literal['laplace', 'lidstone', 'dirichlet'] | None = None,
-            **kwargs
+        self,
+        data_loader: DataLoader,
+        retrieve_type: Literal['tf-idf', 'bm25', 'likelihood'],
+        smooth_type: Literal['laplace', 'lidstone', 'dirichlet'] | None = None,
+        **kwargs
     ):
         """Initialize the class
         
@@ -266,10 +266,10 @@ class TraditionRetriever():
             raise ValueError(f'Unknown retrieve_type {self.retrieve_type}')
 
     def retrieve(
-            self,
-            num_top_results: int | None = None,
-            print_details: bool | None = False,
-            filename: str | None = None
+        self,
+        num_top_results: int | None = None,
+        print_details: bool | None = False,
+        filename: str | None = None
     ):
         """Retrieve.
         
@@ -293,9 +293,9 @@ class TraditionRetriever():
         return retrieval_results
     
     def _retrieve(
-            self,
-            num_top_results: int | None = None,
-            print_details: bool | None = False
+        self,
+        num_top_results: int | None = None,
+        print_details: bool | None = False
     ):
         '''Retrieve according to the query_candidate
 
@@ -325,10 +325,10 @@ class TraditionRetriever():
         return self.scorer(qid=qid, pid=pid)
     
     def reset_retrieval_method(
-            self,
-            retrieve_type: Literal['tf-idf', 'bm25', 'likelihood'] | None = None,
-            smooth_type: Literal['laplace', 'lidstone', 'dirichlet'] | None = None,
-            **kwargs
+        self,
+        retrieve_type: Literal['tf-idf', 'bm25', 'likelihood'] | None = None,
+        smooth_type: Literal['laplace', 'lidstone', 'dirichlet'] | None = None,
+        **kwargs
     ):
         '''Reset the retrival method
 
@@ -404,15 +404,15 @@ def calculate_score_tfidf(tf_idf_query: dict, tf_idf_passage: dict) -> float:
 
 
 def calculate_score_BM25(
-        tf_unnorm_query: dict, 
-        tf_unnorm_passage: dict, 
-        tf_collection: dict,
-        passages_length: int,
-        ave_length: float,
-        num_passages: int,
-        k1: float | None = 1.2,
-        k2: float | None = 100,
-        b: float | None = 0.75
+    tf_unnorm_query: dict, 
+    tf_unnorm_passage: dict, 
+    tf_collection: dict,
+    passages_length: int,
+    ave_length: float,
+    num_passages: int,
+    k1: float | None = 1.2,
+    k2: float | None = 100,
+    b: float | None = 0.75
 ) -> float:
     '''Calculate the score for BM25 model
 
@@ -447,11 +447,11 @@ def calculate_score_BM25(
 
 
 def calculate_score_discounting(
-        tf_unnorm_query: dict, 
-        tf_unnorm_passage: dict,
-        passages_length: int,
-        num_unique_words: int, 
-        eps: float | None = 1
+    tf_unnorm_query: dict, 
+    tf_unnorm_passage: dict,
+    passages_length: int,
+    num_unique_words: int, 
+    eps: float | None = 1
 ) -> float:
     '''Calculate the log score under Laplace smoothing with or without Lidstone correction for the likelihood model
 
@@ -475,10 +475,10 @@ def calculate_score_discounting(
 
 
 def calculate_score_laplace(
-        tf_unnorm_query: dict, 
-        tf_unnorm_passage: dict,
-        passages_length: int,
-        num_unique_words: int
+    tf_unnorm_query: dict, 
+    tf_unnorm_passage: dict,
+    passages_length: int,
+    num_unique_words: int
 ) -> float:
     """Calculate the log score with Laplace smoothing for the likelihood retrieval model
     
@@ -502,11 +502,11 @@ def calculate_score_laplace(
 
 
 def calculate_score_lidstone(
-        tf_unnorm_query: dict, 
-        tf_unnorm_passage: dict,
-        passages_length: int,
-        num_unique_words: int, 
-        eps: float | None = 0.1
+    tf_unnorm_query: dict, 
+    tf_unnorm_passage: dict,
+    passages_length: int,
+    num_unique_words: int, 
+    eps: float | None = 0.1
 ) -> float:
     '''Calculate the log score with Laplace smoothing and Lidstone correction for the likelihood retrieval model
 
@@ -534,12 +534,12 @@ def calculate_score_lidstone(
 
 
 def calculate_score_dirichlet(
-        tf_unnorm_query: dict, 
-        tf_unnorm_passage: dict,
-        tf_collection: dict,
-        passages_length: int,
-        length_collection: int,
-        mu: float | None = 50
+    tf_unnorm_query: dict, 
+    tf_unnorm_passage: dict,
+    tf_collection: dict,
+    passages_length: int,
+    length_collection: int,
+    mu: float | None = 50
 ) -> float:
     '''Calculate the log score under dirichlet smoothing for the likelihood model
 

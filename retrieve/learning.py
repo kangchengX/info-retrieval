@@ -176,9 +176,9 @@ class Trainer:
         train_lag: indicates if the model has been trained
     '''
     def __init__(
-            self,
-            model: Union[LogisticRegression, MLP, LambdaMART],
-            data: pd.DataFrame
+        self,
+        model: Union[LogisticRegression, MLP, LambdaMART],
+        data: pd.DataFrame
     ):
         '''Initialize the model
         
@@ -341,9 +341,9 @@ class Trainer:
 
 class LearningRetriever:
     def __init__(
-            self, 
-            model: RetrieveBaseModel,
-            data: pd.DataFrame
+        self, 
+        model: RetrieveBaseModel,
+        data: pd.DataFrame
     ):
         """Initialize the model
         

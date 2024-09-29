@@ -2,12 +2,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def visualize_frequency_zipfian(
-        fre_norm : np.ndarray, 
-        zipfian : np.ndarray, 
-        filename : str | None = None, 
-        show : bool | None = True
+    fre_norm : np.ndarray, 
+    zipfian : np.ndarray, 
+    filename : str | None = None, 
+    show : bool | None = True
 ):
-    '''Plot the normalized frequency and zipfian values both in normal (linear) and log-log scales
+    """
+    Plot the normalized frequency and zipfian values both in normal (linear) and log-log scales
 
     Args:
         fre_norm: a vector of normalized frequencies with descending order
@@ -20,7 +21,7 @@ def visualize_frequency_zipfian(
 
     Files Created:
         a file with filename if filename is not None, showing the distrubution and zipfian comparsion both in log-log and normal scale
-    '''
+    """
 
     x = np.arange(1,len(fre_norm)+1)
 
@@ -46,3 +47,4 @@ def visualize_frequency_zipfian(
 
     if show:
         plt.show()
+        

@@ -24,11 +24,11 @@ class DocPidDictView:
         pid (str | int): the passage id      
     """
     def __init__(
-            self, 
-            feature_name: Literal['tf', 'tf-unnorm', 'tf-idf'],
-            original: Dict[str, Dict[str, Dict[str | int, Dict[str, int | float]]]] | None = {},
-            pid: str | int | None = None,
-            ignore_pid_init_error: bool | None = False
+        self, 
+        feature_name: Literal['tf', 'tf-unnorm', 'tf-idf'],
+        original: Dict[str, Dict[str, Dict[str | int, Dict[str, int | float]]]] | None = {},
+        pid: str | int | None = None,
+        ignore_pid_init_error: bool | None = False
     ):
         """
         Initilaize the class
@@ -180,9 +180,9 @@ class OneNestedDictView:
         inner_key (str): the inner key
     """
     def __init__(
-            self, 
-            original: Dict[str, Dict[str, int | float]],
-            inner_key: int
+        self, 
+        original: Dict[str, Dict[str, int | float]],
+        inner_key: int
     ):
         """
         Initialize the class
@@ -305,10 +305,10 @@ class DocCollectionDictView(OneNestedDictView):
         feature_name (str): the feature name
     """
     def __init__(
-            self, 
-            feature_name: Literal['idf', 'tf-collection'],
-            original: Dict[str, Dict[str, int | float]] | None = {}
-        ):
+        self, 
+        feature_name: Literal['idf', 'tf-collection'],
+        original: Dict[str, Dict[str, int | float]] | None = {}
+    ):
         """
         Initialize the view class
         
@@ -347,9 +347,9 @@ class QueryDictView(OneNestedDictView):
     """
 
     def __init__(
-            self,
-            feature_name: Literal['tf', 'tf-unnorm', 'tf-idf'],
-            original: Dict[str, Dict[str, int | float]] | None = {}
+        self,
+        feature_name: Literal['tf', 'tf-unnorm', 'tf-idf'],
+        original: Dict[str, Dict[str, int | float]] | None = {}
     ):
         """
         Initialize the view class
@@ -404,15 +404,11 @@ class DocLoader():
     average_length: int | None
 
     def __init__(
-            self,
-            pattern : re.Pattern | None = re.compile(r'[^a-zA-Z\s]'), 
-            lemmatizer: Lemmatizer | None = None, 
-            stopwords : # The above code is a comment in Python. Comments are used to provide
-            # explanations or notes within the code and are not executed by the Python
-            # interpreter. In this case, the comment is indicating that the code below it
-            # is an iterable.
-            Iterable | None = None, 
-            vocabulary : Iterable | None = None
+        self,
+        pattern : re.Pattern | None = re.compile(r'[^a-zA-Z\s]'), 
+        lemmatizer: Lemmatizer | None = None, 
+        stopwords : Iterable | None = None, 
+        vocabulary : Iterable | None = None
     ):
         """
         Initialize the class
@@ -522,11 +518,11 @@ class QueryLoader():
     queries: Dict[Union[str, int], Dict[str, Dict[str, Union[int, float]]]]
 
     def __init__(
-            self, 
-            pattern: re.Pattern | None = re.compile(r'[^a-zA-Z\s]'), 
-            lemmatizer: Lemmatizer | None = None, 
-            stopwords: Iterable | None = None, 
-            vocabulary: Iterable | None = None
+        self, 
+        pattern: re.Pattern | None = re.compile(r'[^a-zA-Z\s]'), 
+        lemmatizer: Lemmatizer | None = None, 
+        stopwords: Iterable | None = None, 
+        vocabulary: Iterable | None = None
     ):
         """
         Initialize the class
@@ -662,14 +658,14 @@ def extract_passage_embedding(doc_loader: DocLoader, word_embedding: KeyedVector
 
 def extract_query_embedding(query_loader: QueryLoader, word_embedding: KeyedVectors):
     """
-    Extract query vector embedding for each query
+    Extract query vector embedding for each query.
     
     Args:
-        query_loader (QueryLoader): the loader containing the queries
-        word_embedding (KeyedVectors): an object mapping the word to the vector
+        query_loader (QueryLoader): the loader containing the queries.
+        word_embedding (KeyedVectors): an object mapping the word to the vector.
 
     Returns:
-        query_embedding (DataFrame): DataFrame with columns ('qid', 'vector')
+        query_embedding (DataFrame): DataFrame with columns ('qid', 'vector').
     """
     zero_vector = np.zeros(len(word_embedding['like']), dtype=word_embedding['like'].dtype)
     queries = query_loader.queries
@@ -691,11 +687,11 @@ def extract_query_embedding(query_loader: QueryLoader, word_embedding: KeyedVect
 
 
 def extract_features(
-        data_loader: DataLoader,
-        word_embedding: KeyedVectors,
-        query_candidate: pd.DataFrame,
-        filename: str | None = None,
-        concatenate: bool | None = True
+    data_loader: DataLoader,
+    word_embedding: KeyedVectors,
+    query_candidate: pd.DataFrame,
+    filename: str | None = None,
+    concatenate: bool | None = True
 ):
     """
     Extract feature representation for the query-passage pair. Use inverted indices in data_loader
