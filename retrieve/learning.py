@@ -6,13 +6,15 @@ import torch.nn as nn
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from warnings import warn
+from abc import ABC, abstractmethod
 
 
-class RetrieveBaseModel:
+class RetrieveBaseModel(ABC):
     '''The base model to train. Polymorphism for the predict method.'''
+    @abstractmethod
     def predict(self):
-        '''Predict.'''
-        raise NotImplementedError("Subclass must implement abstract method")
+        '''Predict. This method must be implemented by subclasses.'''
+        pass
 
 
 class LogisticRegression(RetrieveBaseModel):
